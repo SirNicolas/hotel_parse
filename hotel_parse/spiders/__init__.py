@@ -166,6 +166,7 @@ class TourHotelReviewsSpider(scrapy.Spider):
                 {'reviews': {"$exists": True, "$ne": ""}}):
             yield scrapy.Request(hotel['reviews_url'],
                                  self.check_is_changed,
+                                 method='HEAD',
                                  meta={'hotel': hotel})
 
     def check_is_changed(self, response):
