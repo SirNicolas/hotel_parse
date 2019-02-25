@@ -25,6 +25,8 @@ CITY = '//*[@id="Area_detail_header"]/div[1]/div[2]/ul[1]/' \
 ADDRESS = '//*[@id="Area_hotel_address"]/text()'
 META_DATA = '/html/head/script/text()'
 REVIEWS = '//*[@id="Area_detail_header"]/ul/li[2]/div[2]/span[2]/text()'
+REVIEWS_URL = '//*[@id="Area_detail_header"]/ul/li[2]/div[2]/ul/li[3]/a/@href'
+TO_OTHER_BOOKER_LINK = '//*[@id="main_Col"]/form/input[1]/@value'
 OTHER_LINK = '//*[@id="sub_Col"]/div[1]/ul/li/a/@href'
 
 HOTEL_TYPES_DICT = {
@@ -81,7 +83,7 @@ class TourHotelSpider(scrapy.Spider):
             item['prefecture'] = self.parse_value(response, PREFECTURE)
             item['city'] = self.parse_value(response, CITY)
             item['address'] = self.parse_value(response, ADDRESS)
-            item['reviews'] = self.parse_value(response, REVIEWS)
+            item['rating'] = self.parse_value(response, REVIEWS)
             item['other_offers'] = self.parse_other_links(response)
             item['geo_coordinates'] = pos_x, pos_y
             item['type'] = hotel_type
@@ -103,6 +105,12 @@ class TourHotelSpider(scrapy.Spider):
             agents.append(self.agent_dict[agent_id])
         return agents
 
+    def parse_hotel_reviews(self, response, item):
+        # item['reviews_url'] = self.parse_value(response, REVIEWS_URL)
+        # item['reviews_content_length'] = self.parse_value(response, REVIEWS_URL)
+        # some logic that updates hotel reviews
+        pass
+
     @staticmethod
     def request(url, callback):
         return scrapy.Request(url, callback)
@@ -119,19 +127,22 @@ class TourHotelSpider(scrapy.Spider):
     @staticmethod
     def parse_meta(response):
         hotel_type, pos_x, pos_y = [None] * 3
-        for script in response.xpath(META_DATA).extract():
-            if 'TRAVELKO.APP.hotel_type' in script:
-                values = script.split(';')
-                for value in values:
-                    if hotel_type and pos_x and pos_y:
-                        break
-                    if value.startswith('TRAVELKO.APP.hotel_type'):
-                        hotel_type = int(re.findall('"([^"]*)"', value)[0])
-                    elif value.startswith('TRAVELKO.APP.pos_x'):
-                        pos_x = re.findall('"([^"]*)"', value)[0]
-                    elif value.startswith('TRAVELKO.APP.pos_y'):
-                        pos_y = re.findall('"([^"]*)"', value)[0]
-                break
+        try:
+            for script in response.xpath(META_DATA).extract():
+                if 'TRAVELKO.APP.hotel_type' in script:
+                    values = script.split(';')
+                    for value in values:
+                        if hotel_type and pos_x and pos_y:
+                            break
+                        if value.startswith('TRAVELKO.APP.hotel_type'):
+                            hotel_type = int(re.findall('"([^"]*)"', value)[0])
+                        elif value.startswith('TRAVELKO.APP.pos_x'):
+                            pos_x = re.findall('"([^"]*)"', value)[0]
+                        elif value.startswith('TRAVELKO.APP.pos_y'):
+                            pos_y = re.findall('"([^"]*)"', value)[0]
+                    break
+        except ValueError:
+            pass
         if hotel_type:
             hotel_type = HOTEL_TYPES_DICT[hotel_type]
         return hotel_type, pos_x, pos_y
