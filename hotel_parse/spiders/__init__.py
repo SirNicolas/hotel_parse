@@ -2,7 +2,9 @@ import re
 import json
 import math
 import scrapy
+import pymongo
 from urllib.parse import urljoin, urlparse, parse_qs
+from scrapy.conf import settings
 from hotel_parse.items import HotelItem
 
 
@@ -146,3 +148,32 @@ class TourHotelSpider(scrapy.Spider):
         if hotel_type:
             hotel_type = HOTEL_TYPES_DICT[hotel_type]
         return hotel_type, pos_x, pos_y
+
+
+class TourHotelReviewsSpider(scrapy.Spider):
+
+    name = 'hotel_reviews'
+    review_link = '//*[@id="main_Col"]/form/input[1]/@value'
+
+    def start_requests(self):
+        connection = pymongo.MongoClient(
+            settings['MONGODB_SERVER'],
+            settings['MONGODB_PORT']
+        )
+        db = connection[settings['MONGODB_DB']]
+        self.collection = db[settings['MONGODB_COLLECTION']]
+        for hotel in self.collection.find(
+                {'reviews': {"$exists": True, "$ne": ""}}):
+            yield scrapy.Request(hotel['reviews_url'],
+                                 self.check_is_changed,
+                                 meta={'hotel': hotel})
+
+    def check_is_changed(self, response):
+        hotel = response.meta.get('hotel')
+        content_length = response.headers['Content-Length']
+        if hotel['reviews_content_length'] != content_length:
+            self.parse_hotel_reviews(response, hotel)
+
+    def parse_hotel_reviews(self, response, hotel):
+        # some logic that updates hotel reviews
+        pass
